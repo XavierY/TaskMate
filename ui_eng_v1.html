@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TaskMate · Mock (Autonomy-first)</title>
+  <!-- Tailwind (dev CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    .toast-enter { opacity:0; transform: translateY(6px); }
+    .toast-show  { opacity:1; transform: translateY(0); transition:.25s; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">TaskMate (Mock)</h1>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 text-sm">
+          <input id="dndToggle" type="checkbox" class="h-4 w-4">
+          Focus Mode (DND)
+        </label>
+        <button id="resetBtn" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-sm">
+          Reset Data
+        </button>
+      </div>
+    </header>
+
+    <!-- Goal & Planner -->
+    <section class="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-3">
+      <h2 class="text-lg font-semibold">Goal & Plan</h2>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <input id="goalInput" placeholder="e.g., draft A3 methods section…" class="sm:col-span-2 w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        <button id="genPlanBtn" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-slate-900 text-white">
+          Generate Plan (AI)
+        </button>
+      </div>
+
+      <!-- Subtask add -->
+      <div class="flex gap-2">
+        <input id="taskTitle" placeholder="Subtask: outline, write, check…" class="flex-1 px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        <input id="taskDur" type="number" min="5" value="25" class="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        <button id="addTaskBtn" class="px-4 py-2 rounded-lg bg-slate-900 text-white">Add</button>
+      </div>
+
+      <!-- Plan list -->
+      <ul id="planList" class="space-y-2"></ul>
+    </section>
+
+    <!-- Suggestion Banner (autonomy-first, only if user opted in & channel=banner) -->
+    <section id="suggestBanner" class="hidden bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p id="suggestText" class="font-medium">High distraction risk. Turn on Focus Mode and shorten the block?</p>
+          <p id="suggestWhy" class="hidden mt-1 text-sm text-amber-800/80">
+            Why this: recent high risk level; suggestion respects your chosen frequency and tone; no changes are applied unless you accept.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="acceptSuggest" class="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-sm">Apply</button>
+          <button id="dismissSuggest" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 text-sm">Dismiss</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Risk + Timer -->
+    <section class="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
+      <div class="grid sm:grid-cols-2 gap-6">
+        <!-- Attention Risk -->
+        <div>
+          <h3 class="font-semibold mb-2">Attention Risk (Simulated)</h3>
+          <input id="riskSlider" type="range" min="0" max="100" value="20" class="w-full" />
+          <div class="mt-3 h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div id="riskBar" class="h-3 rounded-full bg-orange-400" style="width:20%"></div>
+          </div>
+          <p class="mt-2 text-sm text-slate-600">Current risk: <span id="riskLabel" class="font-medium">Low</span></p>
+        </div>
+
+        <!-- Focus Timer -->
+        <div>
+          <h3 class="font-semibold mb-2">Focus Timer</h3>
+          <div class="flex items-center gap-3">
+            <button id="startBtn" class="px-4 py-2 rounded-lg bg-emerald-600 text-white">Start</button>
+            <button id="pauseBtn" class="px-4 py-2 rounded-lg bg-amber-600 text-white">Pause</button>
+            <button id="doneBtn"  class="px-4 py-2 rounded-lg bg-slate-900 text-white">Complete Current Subtask</button>
+          </div>
+          <div class="mt-3">
+            <div class="flex justify-between text-sm text-slate-600">
+              <span>Progress</span><span id="timerLabel">0%</span>
+            </div>
+            <div class="mt-1 h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div id="timerBar" class="h-3 rounded-full bg-blue-500" style="width:0%"></div>
+            </div>
+            <p class="mt-2 text-xs text-slate-500">Progress uses the selected subtask duration (demo).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <section class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+      <div class="flex gap-2 border-b border-slate-200 mb-4">
+        <button data-tab="t1" class="tab-btn px-3 py-2 text-sm rounded-t-lg bg-slate-900 text-white">Tips</button>
+        <button data-tab="t2" class="tab-btn px-3 py-2 text-sm rounded-t-lg">Stats</button>
+        <button data-tab="t3" class="tab-btn px-3 py-2 text-sm rounded-t-lg">Settings</button>
+      </div>
+
+      <div id="t1" class="tab-pane">
+        <ul id="tips" class="list-disc pl-5 text-sm space-y-1 text-slate-700">
+          <li>When risk rises, enable DND and shorten focus blocks.</li>
+          <li>Prioritize low-dependency, quick-win subtasks to build momentum.</li>
+          <li>Defer non-urgent pop-ups; batch after focus blocks.</li>
+        </ul>
+      </div>
+
+      <div id="t2" class="tab-pane hidden">
+        <p class="text-sm text-slate-700">
+          Completed <span id="statDone" class="font-semibold">0</span> subtasks this week, total focus <span id="statMin" class="font-semibold">0</span> minutes.
+        </p>
+      </div>
+
+      <!-- SETTINGS — AUTONOMY-FIRST -->
+      <div id="t3" class="tab-pane hidden space-y-6">
+        <div class="space-y-3">
+          <h4 class="font-semibold">Timer Defaults</h4>
+          <div class="flex items-center gap-2">
+            <label class="text-sm w-48">Default Pomodoro length</label>
+            <input id="defaultPomodoro" type="number" min="10" value="25" class="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <h4 class="font-semibold">Guidance & Autonomy</h4>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="flex items-center gap-2">
+              <label class="text-sm w-48">Proactive suggestions</label>
+              <select id="guideEnabled" class="px-3 py-2 rounded-lg border border-slate-200">
+                <option value="on">On (opt-in)</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-sm w-48">Guidance frequency</label>
+              <select id="guideFreq" class="px-3 py-2 rounded-lg border border-slate-200">
+                <option value="light">Light</option>
+                <option value="standard" selected>Standard</option>
+                <option value="high">High</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-sm w-48">Guidance tone</label>
+              <select id="guideTone" class="px-3 py-2 rounded-lg border border-slate-200">
+                <option value="neutral" selected>Neutral</option>
+                <option value="supportive">Supportive</option>
+                <option value="direct">Direct</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-sm w-48">Guidance channel</label>
+              <select id="guideChannel" class="px-3 py-2 rounded-lg border border-slate-200">
+                <option value="toast" selected>Toast</option>
+                <option value="banner">Inline banner</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">
+            You control the frequency, tone, and channel of guidance—designed to avoid coercive nudges and support user autonomy.
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <h4 class="font-semibold">Transparency & Consent</h4>
+          <div class="flex items-center gap-2">
+            <input id="showWhy" type="checkbox" class="h-4 w-4" checked>
+            <label class="text-sm">Show “Why this suggestion” explanations</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="learnPrefs" type="checkbox" class="h-4 w-4">
+            <label class="text-sm">Allow learning from my accept/dismiss (local only)</label>
+          </div>
+          <p class="text-xs text-slate-500">Settings are stored locally (no cloud sync).</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="saveCfg" class="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm">Save Settings</button>
+          <span id="cfgSaved" class="text-xs text-slate-500"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" role="status" aria-live="polite" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg toast-enter pointer-events-none">
+    Saved
+  </div>
+
+  <script>
+    "use strict";
+
+    // ---------- Helpers ----------
+    const $ = (s) => document.querySelector(s);
+    const planList = $("#planList");
+
+    // Frequency policy (cooldown + per-hour cap)
+    const FREQ = {
+      none:     { cooldownMin: Infinity, perHour: 0 },
+      light:    { cooldownMin: 20,       perHour: 2 },
+      standard: { cooldownMin: 10,       perHour: 4 },
+      high:     { cooldownMin: 5,        perHour: 6 },
+    };
+
+    // Demo state
+    const state = {
+      tasks: [],
+      currentIdx: 0,
+      timer: { running:false, elapsed:0, handle:null },
+      stats: { done:0, minutes:0 },
+      settings: {
+        pomodoro: 25,
+        guidance: {
+          enabled: true,             // proactive suggestions on/off
+          frequency: "standard",     // maps to FREQ policy
+          tone: "neutral",           // neutral | supportive | direct
+          channel: "toast",          // toast | banner | none
+          showWhy: true,
+          learnPrefs: false,
+          lastSuggestTs: 0,
+          history: []                // timestamps of suggestions (for per-hour cap)
+        }
+      }
+    };
+
+    // ---------- Storage ----------
+    function saveLocal(){
+      localStorage.setItem("tm_state", JSON.stringify(state));
+    }
+    function loadLocal(){
+      const s = localStorage.getItem("tm_state");
+      if(s){
+        const parsed = JSON.parse(s);
+        // defensive merge for forward compatibility
+        Object.assign(state, parsed);
+        state.settings = Object.assign({
+          pomodoro: 25,
+          guidance: { enabled:true, frequency:"standard", tone:"neutral", channel:"toast", showWhy:true, learnPrefs:false, lastSuggestTs:0, history:[] }
+        }, parsed.settings || {});
+      }
+    }
+
+    // ---------- Toast ----------
+    function toast(msg="Saved"){
+      const t = $("#toast");
+      t.textContent = msg;
+      t.classList.add("toast-show");
+      setTimeout(()=>t.classList.remove("toast-show"), 1300);
+    }
+
+    // ---------- Demo plan ----------
+    const demoPlan = (goal)=>([
+      { title: `Clarify scope: ${goal || "Goal"}`, dur: 20, done:false },
+      { title: "Outline key points",          dur: 25, done:false },
+      { title: "Draft core sections",         dur: 30, done:false },
+      { title: "Review & citations",          dur: 15, done:false },
+    ]);
+
+    // ---------- Render plan ----------
+    function renderPlan(){
+      planList.innerHTML = "";
+      state.tasks.forEach((t, i)=>{
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between gap-2 p-3 rounded-xl border border-slate-200";
+        li.innerHTML = `
+          <div class="flex items-center gap-2">
+            <input data-idx="${i}" type="radio" name="pick" ${i===state.currentIdx?"checked":""} class="h-4 w-4">
+            <div>
+              <div class="font-medium ${t.done?"line-through text-slate-400":""}">${t.title}</div>
+              <div class="text-xs text-slate-500">${t.dur} min</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button data-done="${i}" class="px-2 py-1 rounded-md text-xs ${t.done?'bg-emerald-50 text-emerald-700':'bg-emerald-600 text-white'}">${t.done?"Completed":"Mark Done"}</button>
+            <button data-del="${i}" class="px-2 py-1 rounded-md text-xs bg-slate-100">Delete</button>
+          </div>
+        `;
+        planList.appendChild(li);
+      });
+      saveLocal();
+    }
+
+    function addTask(title, dur){
+      state.tasks.push({ title, dur: Number(dur||25), done:false });
+      state.currentIdx = state.tasks.length-1;
+      renderPlan();
+    }
+
+    // ---------- Stats ----------
+    function updateStatsUI(){
+      $("#statDone").textContent = state.stats.done||0;
+      $("#statMin").textContent  = state.stats.minutes||0;
+    }
+
+    // ---------- Tabs ----------
+    document.querySelectorAll(".tab-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("bg-slate-900","text-white"));
+        btn.classList.add("bg-slate-900","text-white");
+        document.querySelectorAll(".tab-pane").forEach(p=>p.classList.add("hidden"));
+        $("#"+btn.dataset.tab).classList.remove("hidden");
+      });
+    });
+
+    // ---------- Risk slider + autonomy-aware suggestions ----------
+    const riskNames = (x)=> x<33 ? "Low" : (x<66 ? "Medium" : "High");
+
+    function toneText(tone){
+      if(tone==="supportive") return "You're doing great—risk is high. Enable Focus Mode and shorten the block?";
+      if(tone==="direct")     return "High distraction risk. Turn on Focus Mode and shorten the block.";
+      return "High risk detected — consider enabling Focus Mode and shortening the block.";
+    }
+
+    function withinPolicy(){
+      const g = state.settings.guidance;
+      const policy = FREQ[g.frequency] || FREQ.standard;
+      if(policy.perHour===0) return false;
+
+      const now = Date.now();
+      const since = (now - g.lastSuggestTs) / 60000;
+      if(since < policy.cooldownMin) return false;
+
+      // keep last 60 min history
+      g.history = (g.history||[]).filter(ts => (now - ts) < 3600000);
+      if(g.history.length >= policy.perHour) return false;
+
+      return true;
+    }
+
+    function showSuggestion(){
+      const g = state.settings.guidance;
+      const text = toneText(g.tone);
+
+      if(g.channel==="toast"){
+        toast(text);
+      } else if(g.channel==="banner"){
+        $("#suggestText").textContent = text;
+        $("#suggestWhy").classList.toggle("hidden", !g.showWhy);
+        $("#suggestBanner").classList.remove("hidden");
+      }
+      // record
+      const now = Date.now();
+      g.lastSuggestTs = now;
+      g.history = g.history || [];
+      g.history.push(now);
+      saveLocal();
+    }
+
+    function maybeSuggest(){
+      const g = state.settings.guidance;
+      if(!g.enabled) return;
+      if(g.channel==="none") return;
+      if(!withinPolicy()) return;
+      showSuggestion();
+    }
+
+    $("#riskSlider").addEventListener("input", (e)=>{
+      const v = Number(e.target.value);
+      $("#riskBar").style.width = v+"%";
+      $("#riskLabel").textContent = riskNames(v);
+      if(v>=66){ maybeSuggest(); }
+    });
+
+    // Accept / Dismiss banner suggestion
+    $("#acceptSuggest").addEventListener("click", ()=>{
+      // Apply: enable DND + shorten default pomodoro to 15 (local only)
+      $("#dndToggle").checked = true;
+      document.body.style.pointerEvents = "none";
+      document.querySelector(".max-w-4xl").style.pointerEvents = "auto";
+
+      state.settings.pomodoro = Math.min(state.settings.pomodoro||25, 15);
+      $("#defaultPomodoro").value = state.settings.pomodoro;
+
+      $("#suggestBanner").classList.add("hidden");
+      toast("Applied: DND on, default block set to 15 min");
+      saveLocal();
+    });
+    $("#dismissSuggest").addEventListener("click", ()=>{
+      $("#suggestBanner").classList.add("hidden");
+      if(state.settings.guidance.learnPrefs){
+        // lightweight local signal (no external storage)
+        state.settings.guidance.frequency = "light";
+      }
+      saveLocal();
+    });
+
+    // ---------- Timer ----------
+    function setTimerProgress(pct){
+      $("#timerBar").style.width = Math.min(100, Math.max(0,pct))+"%";
+      $("#timerLabel").textContent = Math.round(pct)+"%";
+    }
+    function tick(){
+      if(!state.tasks.length){ return; }
+      const cur = state.tasks[state.currentIdx];
+      const totalMs = cur.dur * 60 * 1000;
+      state.timer.elapsed += 1000;
+      const pct = (state.timer.elapsed/totalMs)*100;
+      setTimerProgress(pct);
+      if(pct>=100){
+        clearInterval(state.timer.handle);
+        state.timer.running=false;
+        toast("Time's up — take a short break");
+      }
+    }
+    $("#startBtn").addEventListener("click", ()=>{
+      if(!state.tasks.length){ toast("Add or generate a subtask first"); return; }
+      if(state.timer.running) return;
+      state.timer.running = true;
+      state.timer.handle = setInterval(tick, 1000);
+    });
+    $("#pauseBtn").addEventListener("click", ()=>{
+      state.timer.running=false;
+      clearInterval(state.timer.handle);
+    });
+    $("#doneBtn").addEventListener("click", ()=>{
+      if(!state.tasks.length){ return; }
+      state.tasks[state.currentIdx].done = true;
+      state.stats.done++;
+      state.stats.minutes += state.tasks[state.currentIdx].dur;
+      setTimerProgress(100);
+      state.timer.running=false;
+      clearInterval(state.timer.handle);
+      toast("Marked as done");
+      renderPlan();
+      updateStatsUI();
+    });
+
+    // ---------- Settings handlers ----------
+    $("#saveCfg").addEventListener("click", ()=>{
+      state.settings.pomodoro = Number($("#defaultPomodoro").value||25);
+      state.settings.guidance.enabled   = $("#guideEnabled").value === "on";
+      state.settings.guidance.frequency = $("#guideFreq").value;
+      state.settings.guidance.tone      = $("#guideTone").value;
+      state.settings.guidance.channel   = $("#guideChannel").value;
+      state.settings.guidance.showWhy   = $("#showWhy").checked;
+      state.settings.guidance.learnPrefs= $("#learnPrefs").checked;
+      $("#cfgSaved").textContent = "Saved locally.";
+      toast("Settings saved");
+      saveLocal();
+      setTimeout(()=>$("#cfgSaved").textContent="", 1200);
+    });
+
+    // DND demo: when enabled, block page clicks except this panel
+    $("#dndToggle").addEventListener("change", (e)=>{
+      if(e.target.checked){
+        document.body.style.pointerEvents = "none";
+        document.querySelector(".max-w-4xl").style.pointerEvents = "auto";
+        toast("Focus mode on");
+      }else{
+        document.body.style.pointerEvents = "auto";
+        toast("Focus mode off");
+      }
+    });
+
+    // Plan interactions
+    $("#genPlanBtn").addEventListener("click", ()=>{
+      const goal = $("#goalInput").value.trim();
+      if(!goal){ toast("Enter a goal first"); return; }
+      state.tasks = demoPlan(goal);
+      state.currentIdx = 0;
+      state.timer.elapsed = 0;
+      renderPlan();
+      toast("Plan generated");
+    });
+    $("#addTaskBtn").addEventListener("click", ()=>{
+      const t = $("#taskTitle").value.trim();
+      const d = $("#taskDur").value.trim();
+      if(!t){ toast("Subtask title is required"); return; }
+      addTask(t, d);
+      $("#taskTitle").value = "";
+    });
+    planList.addEventListener("click", (e)=>{
+      const r = e.target.closest("input[type=radio]");
+      const del = e.target.closest("button[data-del]");
+      const doneBtn = e.target.closest("button[data-done]");
+      if(r){ state.currentIdx = Number(r.dataset.idx); state.timer.elapsed=0; renderPlan(); }
+      if(del){ 
+        const idx = Number(del.dataset.del);
+        state.tasks.splice(idx,1);
+        state.currentIdx = Math.max(0, Math.min(state.currentIdx, state.tasks.length-1));
+        renderPlan(); 
+      }
+      if(doneBtn){
+        const idx = Number(doneBtn.dataset.done);
+        state.tasks[idx].done = !state.tasks[idx].done;
+        if(state.tasks[idx].done) { state.stats.done++; state.stats.minutes += state.tasks[idx].dur; }
+        renderPlan();
+        updateStatsUI();
+      }
+    });
+
+    // ---------- Boot ----------
+    loadLocal();
+    if(!state.tasks.length){ state.tasks = demoPlan(""); }
+    renderPlan();
+    updateStatsUI();
+
+    // hydrate settings UI
+    $("#defaultPomodoro").value = state.settings.pomodoro || 25;
+    $("#guideEnabled").value = state.settings.guidance.enabled ? "on" : "off";
+    $("#guideFreq").value    = state.settings.guidance.frequency || "standard";
+    $("#guideTone").value    = state.settings.guidance.tone || "neutral";
+    $("#guideChannel").value = state.settings.guidance.channel || "toast";
+    $("#showWhy").checked    = !!state.settings.guidance.showWhy;
+    $("#learnPrefs").checked = !!state.settings.guidance.learnPrefs;
+  </script>
+</body>
+</html>
